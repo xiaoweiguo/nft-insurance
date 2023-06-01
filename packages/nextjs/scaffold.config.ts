@@ -13,7 +13,8 @@ export type ScaffoldConfig = {
 
 const scaffoldConfig = {
   // The network where your DApp lives in
-  targetNetwork: chains.hardhat,
+  //targetNetwork: chains.hardhat,
+  targetNetwork: chains.polygonMumbai,
 
   // The interval at which your front-end polls the RPC servers for new data
   // it has no effect on the local network
@@ -23,7 +24,7 @@ const scaffoldConfig = {
   // You can get your own at https://dashboard.alchemyapi.io
   // It's recommended to store it in an env variable:
   // .env.local for local testing, and in the Vercel/system env config for live apps.
-  alchemyApiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF",
+  alchemyApiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "hau9ymKZ9ubQk-WiC_D4WfF_1Ki7NGdg",
 
   // Burner Wallet configuration
   burnerWallet: {
