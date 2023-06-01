@@ -3,29 +3,37 @@
 pragma solidity ^0.8.10;
 
 import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 import "./library/LinkedList.sol";
+
 import "./interfaces/IDAO.sol";
 import "./interfaces/IInsurance.sol";
 
 contract Insurance is AutomationCompatibleInterface, IInsurance {
   using LinkedListLib for LinkedListLib.UintLinkedList;
 
+  AggregatorV3Interface internal nftFloorPriceFeed;
   address immutable Azuki_Address;
   address payable immutable Pool_Address;
   IDAO immutable DAO;
+
+  uint premiumRateFactor = 30; // 30%
   uint policyIdCounter;
   LinkedListLib.UintLinkedList linkedListPolicies;
 
+  /// @notice userAddress => policyId
+  mapping(address => uint[]) userToPolicyId;
   /// @notice policyId => InsurancePolicy
-  mapping(uint => InsurancePolicy) public insurancePolicies;
+  mapping(uint => InsurancePolicy) insurancePolicies;
   /// @notice tokenId => policyId
-  mapping(uint => uint) public tokenIdToPolicyId;
+  mapping(uint => uint) tokenIdToPolicyId;
 
   constructor(address AzukiAddress, address DAOAddress, address PoolAddress) {
     Azuki_Address = AzukiAddress;
     DAO = IDAO(DAOAddress);
     Pool_Address = payable(PoolAddress);
+    nftFloorPriceFeed = AggregatorV3Interface(0x16c74d1f6986c6Ffb48540b178fF8Cb0ED9F13b0);
   }
 
   struct InsurancePolicy {
@@ -42,22 +50,13 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
     bool isActive;
   }
 
-  /**
-   * @notice calculate the required premium
-   * @param tokenId the token id of the NFT
-   * @param insuranceDuration the duration of the insurance
-   */
-  function calculatePremium(uint tokenId, uint insuranceDuration) public view returns (uint price) {
-    return 2e18;
-  }
-
   modifier onlyDAO() {
     require(msg.sender == address(DAO), "Only DAO can call this function");
     _;
   }
 
   function createProposal(uint tokenId_, uint insuranceDuration, uint claimTrigger) public payable {
-    uint insurancePremium = calculatePremium(tokenId_, insuranceDuration);
+    uint insurancePremium = calculatePremium(insuranceDuration, claimTrigger);
     require(msg.value >= insurancePremium, "Insufficient premium paid");
     DAO.createProposal(tokenId_, insuranceDuration, insurancePremium, claimTrigger, msg.sender);
     if (msg.value > insurancePremium) {
@@ -67,6 +66,7 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
 
   function proposalFailed(address _to, uint price) external onlyDAO {
     payable(_to).transfer(price);
+    emit ProposalFailed(_to, price);
   }
 
   /**
@@ -78,7 +78,7 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
     uint insurancePremium,
     uint claimTrigger,
     address beneficiaryAddress
-  ) public onlyDAO returns (uint policyId) {
+  ) external onlyDAO returns (uint policyId) {
     require(tokenIdToPolicyId[tokenId_] == 0, "Policy already exists");
     policyId = ++policyIdCounter;
     Pool_Address.transfer(insurancePremium);
@@ -92,6 +92,8 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
       claimTrigger,
       true
     );
+    uint[] storage policies = userToPolicyId[beneficiaryAddress];
+    policies.push(policyId);
     tokenIdToPolicyId[tokenId_] = policyId;
 
     linkedListPolicies.add(policyId);
@@ -99,37 +101,17 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
   }
 
   /**
-   * @notice cancel an existing insurance policy
-   */
-  function _cancelPolicy(uint policyId) internal {
-    linkedListPolicies.remove(policyId);
-    insurancePolicies[policyId].isActive = false;
-    uint tokenId = insurancePolicies[policyId].tokenId;
-    delete tokenIdToPolicyId[tokenId];
-  }
-
-  /**
    * @notice insurance expiration not triggered
    */
-  function expiredDown(uint policyId) public returns (bool) {
+  function expiredDown(uint policyId) public {
     require(insurancePolicies[policyId].isActive == true, "Policy is not active");
     require(_checkExpiredDown(policyId), "Policy is not expired");
 
     _cancelPolicy(policyId);
-
-    return true;
+    emit ExpiredDown(policyId);
   }
 
-  function _triggerInsurance(uint policyId) internal returns (bool) {
-    require(insurancePolicies[policyId].isActive == true, "Policy is not active");
-    require(_checkExpiredDown(policyId), "Policy is expired");
-
-    DAO.triggerInsurance(insurancePolicies[policyId].beneficiaryAddress, insurancePolicies[policyId].claimTrigger);
-    _cancelPolicy(policyId);
-
-    return true;
-  }
-
+  /// chainlink automation
   function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory performData) {
     upkeepNeeded = false;
     uint[] memory results = new uint[](policyIdCounter);
@@ -148,10 +130,6 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
     return (upkeepNeeded, performData);
   }
 
-  function _checkExpiredDown(uint policyId) internal view returns (bool) {
-    return insurancePolicies[policyId].startTime + insurancePolicies[policyId].insuranceDuration <= block.timestamp;
-  }
-
   function performUpkeep(bytes calldata performData) external override {
     uint[] memory results = abi.decode(performData, (uint[]));
     for (uint i = 0; i < results.length; i++) {
@@ -161,5 +139,79 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
         expiredDown(results[i]);
       }
     }
+  }
+
+  ///internal function
+
+  /**
+   * Returns the latest price
+   */
+  function _getLatestNFTPrice() internal view returns (uint) {
+    (, int nftFloorPrice, , , ) = nftFloorPriceFeed.latestRoundData();
+    return uint(nftFloorPrice);
+  }
+
+  /**
+   * @notice cancel an existing insurance policy
+   */
+  function _cancelPolicy(uint policyId) internal {
+    linkedListPolicies.remove(policyId);
+    insurancePolicies[policyId].isActive = false;
+    uint tokenId = insurancePolicies[policyId].tokenId;
+    delete tokenIdToPolicyId[tokenId];
+  }
+
+  function _triggerInsurance(uint policyId) internal {
+    require(insurancePolicies[policyId].isActive == true, "Policy is not active");
+    require(_checkExpiredDown(policyId), "Policy is expired");
+
+    DAO.triggerInsurance(insurancePolicies[policyId].beneficiaryAddress, insurancePolicies[policyId].claimTrigger);
+    _cancelPolicy(policyId);
+  }
+
+  function _checkExpiredDown(uint policyId) internal view returns (bool) {
+    return insurancePolicies[policyId].startTime + insurancePolicies[policyId].insuranceDuration <= block.timestamp;
+  }
+
+  /// view function
+
+  /**
+   * @notice calculate the required premium
+   * @param insuranceDuration the duration of the insurance
+   * @param claimTrigger the claim trigger
+   */
+  function calculatePremium(uint insuranceDuration, uint claimTrigger) public view returns (uint price) {
+    require(insuranceDuration % 1 days == 0 && insuranceDuration / 1 days < 6, "Invalid insurance duration");
+    require(
+      claimTrigger == 15e18 ||
+        claimTrigger == 13e18 ||
+        claimTrigger == 12e18 ||
+        claimTrigger == 11e18 ||
+        claimTrigger == 105e17,
+      "Invalid claim trigger"
+    );
+    uint NFTLatestPrice = _getLatestNFTPrice();
+    price = (NFTLatestPrice * premiumRateFactor * claimTrigger * insuranceDuration) / 1 days / 100;
+  }
+
+  function getPolicyInfoByPolicyId(uint policyId) external view returns (InsurancePolicy memory) {
+    return insurancePolicies[policyId];
+  }
+
+  function getPolicyInfoByTokenId(uint tokenId) external view returns (InsurancePolicy memory) {
+    return insurancePolicies[tokenIdToPolicyId[tokenId]];
+  }
+
+  function getPolicyIdByTokenId(uint tokenId) external view returns (uint) {
+    return tokenIdToPolicyId[tokenId];
+  }
+
+  function getPolicyInfoByUser(address userAddress) external view returns (InsurancePolicy[] memory) {
+    uint[] memory policies = userToPolicyId[userAddress];
+    InsurancePolicy[] memory results = new InsurancePolicy[](policies.length);
+    for (uint i = 0; i < policies.length; i++) {
+      results[i] = insurancePolicies[policies[i]];
+    }
+    return results;
   }
 }

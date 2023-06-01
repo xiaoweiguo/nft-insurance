@@ -10,12 +10,9 @@ import "./library/LinkedList.sol";
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
 import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 
 contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
-  using SafeMath for uint;
   using LinkedListLib for LinkedListLib.UintLinkedList;
 
   LinkedListLib.UintLinkedList linkedListProposals;
@@ -23,7 +20,9 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
   ILiquidityPool public immutable pool;
   uint public numStakeholders;
   uint public proposalIdCounter;
-  uint public constant SHORTEST_STAKE_TIME = 10 days;
+
+  /// constant
+  uint public constant SHORTEST_STAKE_TIME = 5 seconds;
   uint public constant MAX_PROPOSAL_DURATION = 1 days;
 
   /// @notice tokenId => Proposal
@@ -58,16 +57,6 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     bool isPass;
   }
 
-  function _isExpired(uint proposalId) internal view returns (bool) {
-    return block.timestamp >= proposals[proposalId].createTime.add(MAX_PROPOSAL_DURATION);
-  }
-
-  function _removeProposal(uint proposalId) internal {
-    linkedListProposals.remove(proposalId);
-    proposals[proposalId].isActive = false;
-    delete tokenIdToProposal[proposals[proposalId].tokenId];
-  }
-
   function proposalExpired(uint proposalId) external {
     insurance.proposalFailed(proposals[proposalId].beneficiaryAddress, proposals[proposalId].insurancePremium);
   }
@@ -75,38 +64,41 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
   function stake(uint stakingAmount) external payable {
     require(msg.value == stakingAmount, "Incorrect staking amount");
     if (isStakeholder[msg.sender] == false) {
-      numStakeholders = numStakeholders.add(1);
+      ++numStakeholders;
       isStakeholder[msg.sender] = true;
     }
     uint mintAmount;
     if (address(pool).balance == 0) {
       mintAmount = stakingAmount;
     } else {
-      mintAmount = msg.value.mul(totalSupply()).div(address(pool).balance);
+      mintAmount = (msg.value * totalSupply()) / (address(pool).balance);
     }
 
-    stakingHolders[msg.sender].stakingAmount = stakingHolders[msg.sender].stakingAmount.add(mintAmount);
+    stakingHolders[msg.sender].stakingAmount = stakingHolders[msg.sender].stakingAmount + mintAmount;
     stakingHolders[msg.sender].startTime = block.timestamp;
     _mint(msg.sender, mintAmount);
     payable(address(pool)).transfer(stakingAmount);
+
+    emit Stake(msg.sender, stakingAmount, block.timestamp);
   }
 
-  function getAmount(uint stakingAmount) public view returns (uint) {
-    uint perAZDAOToETH = address(pool).balance.div(totalSupply());
-    return stakingAmount.mul(perAZDAOToETH);
+  function getAmount(uint stakingAmount) external view returns (uint) {
+    return _getAmount(stakingAmount);
   }
 
   function withdraw(uint stakingAmount) external {
     require(stakingHolders[msg.sender].stakingAmount >= stakingAmount, "Insufficient staking amount");
-    require(block.timestamp >= stakingHolders[msg.sender].startTime.add(10 days), "Staking period not over");
-    uint withdrawAmount = getAmount(stakingAmount);
+    require(block.timestamp >= stakingHolders[msg.sender].startTime + SHORTEST_STAKE_TIME, "Staking period not over");
+    uint withdrawAmount = _getAmount(stakingAmount);
     if (stakingHolders[msg.sender].stakingAmount == 0) {
       isStakeholder[msg.sender] = false;
-      numStakeholders = numStakeholders.sub(1);
+      --numStakeholders;
     }
-    stakingHolders[msg.sender].stakingAmount = stakingHolders[msg.sender].stakingAmount.sub(stakingAmount);
+    stakingHolders[msg.sender].stakingAmount -= stakingAmount;
     _burn(msg.sender, stakingAmount);
     pool.sendEth(payable(msg.sender), withdrawAmount);
+
+    emit Withdraw(msg.sender, stakingAmount, block.timestamp);
   }
 
   function createProposal(
@@ -118,8 +110,7 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
   ) external {
     require(msg.sender == address(insurance), "Only insurance can call");
     require(proposals[tokenId_].isActive == false, "Proposal already exists");
-    proposalIdCounter = proposalIdCounter.add(1);
-    uint proposalId = proposalIdCounter;
+    uint proposalId = ++proposalIdCounter;
     linkedListProposals.add(proposalId);
 
     proposals[proposalId] = Proposal(
@@ -130,12 +121,14 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
       block.timestamp,
       claimTrigger,
       0,
-      numStakeholders > 2 ? numStakeholders.div(2) : numStakeholders,
+      numStakeholders > 2 ? numStakeholders / 2 : numStakeholders,
       beneficiaryAddress,
       true,
       false
     );
     tokenIdToProposal[tokenId_] = proposals[proposalId];
+
+    emit CreateProposal(proposalId, tokenId_, beneficiaryAddress, block.timestamp);
   }
 
   function vote(uint proposalId) external {
@@ -144,7 +137,7 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     require(isVoted[msg.sender][proposalId] == false, "Already voted");
     Proposal storage proposal = proposals[proposalId];
     isVoted[msg.sender][proposalId] = true;
-    proposal.numVotes = proposal.numVotes.add(1);
+    ++proposal.numVotes;
     if (_checkProposal(proposalId)) {
       proposal.isPass = true;
       _removeProposal(proposalId);
@@ -156,6 +149,24 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
         proposal.beneficiaryAddress
       );
     }
+
+    emit Vote(msg.sender, proposalId, block.timestamp);
+  }
+
+  function setInsuranceAddress(address _insuranceAddress) external onlyOwner {
+    insurance = IInsurance(_insuranceAddress);
+  }
+
+  function triggerInsurance(address _to, uint amount) external {
+    require(msg.sender == address(insurance), "Only insurance can call");
+    pool.sendEth(payable(_to), amount);
+  }
+
+  ///internal function
+
+  function _getAmount(uint stakingAmount) internal view returns (uint) {
+    uint perAZDAOToETH = address(pool).balance / (totalSupply());
+    return stakingAmount * perAZDAOToETH;
   }
 
   function _createPolicy(
@@ -172,17 +183,17 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     return proposals[proposalId].numVotes >= proposals[proposalId].targetVotes;
   }
 
-  function setInsuranceAddress(address _insuranceAddress) external onlyOwner {
-    insurance = IInsurance(_insuranceAddress);
+  function _isExpired(uint proposalId) internal view returns (bool) {
+    return block.timestamp >= proposals[proposalId].createTime + MAX_PROPOSAL_DURATION;
   }
 
-  function triggerInsurance(address _to, uint amount) external {
-    require(msg.sender == address(insurance), "Only insurance can call");
-    pool.sendEth(payable(_to), amount);
+  function _removeProposal(uint proposalId) internal {
+    linkedListProposals.remove(proposalId);
+    proposals[proposalId].isActive = false;
+    delete tokenIdToProposal[proposals[proposalId].tokenId];
   }
 
   /// view function
-
   function getStakingStartTime(address user) external view returns (uint) {
     return stakingHolders[user].startTime;
   }
@@ -203,6 +214,7 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     proposal = proposals[proposalId];
   }
 
+  /// chainlink automation
   function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory performData) {
     upkeepNeeded = false;
     uint proposalId = linkedListProposals.getNode(0).next;
