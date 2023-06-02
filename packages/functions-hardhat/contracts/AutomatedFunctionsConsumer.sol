@@ -151,15 +151,12 @@ contract AutomatedFunctionsConsumer is FunctionsClient, ConfirmedOwner, Automati
     latestResponse = response;
     latestError = err;
     responseCounter = responseCounter + 1;
-    uint256 lastestPrice =  getLatestPrice();
-    uint256 floorPrice = uint256(response);
+    uint256 floorPrice = getLatestPrice();
+    uint256 lastestPrice = uint256(response);
     // Insurance calculate
-
 
     emit OCRResponse(requestId, response, err);
   }
-
-
 
   /**
    * @notice Allows the Functions oracle address to be updated
