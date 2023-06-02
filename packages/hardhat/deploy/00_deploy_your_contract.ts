@@ -21,10 +21,8 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  await deploy("YourContract", {
+  await deploy("LiquidityPool", {
     from: deployer,
-    // Contract constructor arguments
-    args: [deployer],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
@@ -32,7 +30,18 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   });
 
   // Get the deployed contract
-  // const yourContract = await hre.ethers.getContract("YourContract", deployer);
+  const pool = await hre.ethers.getContract("LiquidityPool", deployer);
+  const poolAddress = (await hre.ethers.getContract("LiquidityPool", deployer)).address;
+  console.log("poolAddress:" + poolAddress);
+  await deploy("DAO", {
+    from: deployer,
+    args: [poolAddress],
+    log: true,
+  });
+  const DAO = await hre.ethers.getContract("YourContract", deployer);
+  const DAOAddress = DAO.address;
+  console.log("DAOAddress:" + DAOAddress);
+  await pool.setDAOAddress(poolAddress);
 };
 
 export default deployYourContract;
