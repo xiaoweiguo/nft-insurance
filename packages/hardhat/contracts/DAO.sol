@@ -57,6 +57,7 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     bool isPass;
   }
 
+
   function proposalExpired(uint proposalId) external {
     insurance.proposalFailed(proposals[proposalId].beneficiaryAddress, proposals[proposalId].insurancePremium);
   }
@@ -131,7 +132,8 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     emit CreateProposal(proposalId, tokenId_, beneficiaryAddress, block.timestamp);
   }
 
-  function vote(uint proposalId) external {
+  function vote(uint proposalId) external{
+    require(isStakeholder[msg.sender] == true, "Only DAO member can call");
     require(proposals[proposalId].isActive == true, "Proposal is not active");
     require(proposals[proposalId].isPass == false, "Proposal already pass");
     require(isVoted[msg.sender][proposalId] == false, "Already voted");
