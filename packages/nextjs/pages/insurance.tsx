@@ -32,7 +32,17 @@ const Insurance: NextPage = () => {
 
   const listItems = nfts.map(nft => (
     <li key={nft.token_hash}>
-      {nft.metadata.name} ({nft.token_id})
+      <div className="flex">
+        <div className="avatar">
+          <div className="w-16 rounded-full">
+            <img src={nft.metadata.image} />
+          </div>
+        </div>
+        <div>
+          <div className="font-bold">{nft.metadata.name} </div>
+          <div className="text-sm">{nft.name} </div>
+        </div>
+      </div>
     </li>
   ));
 
@@ -60,8 +70,12 @@ const Insurance: NextPage = () => {
                   </p>
                 )}
               </div>
-              <div className="bg-base-300 rounded-3xl px-6 lg:px-8 py-4 shadow-lg shadow-base-300">
-                {nfts.length === 0 ? <p className="text-1xl mt-14">No Azuki found!</p> : <ul>{listItems}</ul>}
+              <div className="bg-base-300 rounded-3xl px-4 lg:px-2 py-4 shadow-lg shadow-base-300">
+                {nfts.length === 0 ? (
+                  <p className="text-1xl mt-14">No Azuki found!</p>
+                ) : (
+                  <ul className="menu p-4 w-70 text-base-content">{listItems}</ul>
+                )}
               </div>
             </div>
           </div>
