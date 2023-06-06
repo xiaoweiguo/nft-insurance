@@ -191,7 +191,7 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
       "Invalid claim trigger"
     );
     uint NFTLatestPrice = _getLatestNFTPrice();
-    price = premiumRateFactor * (NFTLatestPrice - claimTrigger) * insuranceDuration) / 1 days / 100;
+    price = (NFTLatestPrice * claimTrigger * premiumRateFactor * insuranceDuration) / 1 days / 100;
   }
 
   function getPolicyInfoByPolicyId(uint policyId) external view returns (InsurancePolicy memory) {
