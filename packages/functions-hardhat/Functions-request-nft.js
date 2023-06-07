@@ -6,6 +6,7 @@
 
 const tokenId = args[0];
 
+
 if (!secrets.openSeaKey) {
   throw Error(
     "Need to set opensea api KEY environment variable"
@@ -24,7 +25,10 @@ const config = {
   }
 };
 
+
 const response = await Functions.makeHttpRequest(config)
+
+
 console.log(response)
 
 if (response.error) {
@@ -35,10 +39,12 @@ if (response.error) {
 }
 
 const nftDATA = response.data.data
+
+
 console.log(nftDATA)
 const asset = nftDATA.asset_events[0]
+
+
 console.log(asset)
 console.log(asset.total_price)
-
-
 return Functions.encodeUint256(asset.total_price)
