@@ -13,10 +13,11 @@ if (!secrets.openSeaKey) {
   )
 }
 
-
+//${insurance_end/begin_time} format:2022-01-21 00:00:00
+//asset_contract_address: Azuki address
 const config = {
   method: 'GET',
-  url: `https://api.opensea.io/api/v1/events?token_id=${tokenId}&asset_contract_address=0xED5AF388653567Af2F388E6224dC7C4b3241C544&event_type=successful&occurred_before=${insurance_end_time}&occurred_after=${insuranc_begin_time}`,
+  url: `https://api.opensea.io/api/v1/events?token_id=${tokenId}&asset_contract_address=0xED5AF388653567Af2F388E6224dC7C4b3241C544&account_address=${nft_holder_openseaaccount_adress}&event_type=successful&occurred_before=${insurance_end_time}&occurred_after=${insuranc_begin_time}`,
   timeout:5000,
   maxRedirects: 5,
   headers: {
