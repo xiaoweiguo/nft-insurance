@@ -8,7 +8,7 @@ const tokenId = args[0];
 
 if (!secrets.openSeaKey) {
   throw Error(
-    "Need to set NFTGOKEY environment variable"
+    "Need to set opensea api KEY environment variable"
   )
 }
 
