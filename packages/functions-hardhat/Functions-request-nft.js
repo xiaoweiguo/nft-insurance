@@ -20,7 +20,7 @@ const config = {
   maxRedirects: 5,
   headers: {
     'Accept': 'application/json',
-    'X-API-KEY': `${secrets.openSeaKey}`,
+    'X-API-KEY': `8d86c5ba1a4d4a868477cbfcf5cd1872`,
   }
 };
 
