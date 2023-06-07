@@ -16,7 +16,7 @@ if (!secrets.openSeaKey) {
 
 const config = {
   method: 'GET',
-  url: `https://api.opensea.io/api/v1/events?token_id=${tokenId}&asset_contract_address=0xED5AF388653567Af2F388E6224dC7C4b3241C544&event_type=successful`,
+  url: `https://api.opensea.io/api/v1/events?token_id=${tokenId}&asset_contract_address=0xED5AF388653567Af2F388E6224dC7C4b3241C544&event_type=successful&occurred_before=${insurance_end_time}&occurred_after=${insuranc_begin_time}`,
   timeout:5000,
   maxRedirects: 5,
   headers: {
