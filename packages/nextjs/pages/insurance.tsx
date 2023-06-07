@@ -10,13 +10,15 @@ const Insurance: NextPage = () => {
   const { address } = useAccount();
   const configuredNetwork = getTargetNetwork();
   const networkColor = useNetworkColor();
+  console.log(48);
 
   const [nfts, setNfts] = useState([]);
 
+  console.log(nfts);
   fetchNFTs(address).then(res => {
     //console.log(9, nfts)
     if (res == undefined) return;
-
+    console.log(98);
     res.map(item => {
       //const n = item.toJSON();
 
@@ -44,6 +46,12 @@ const Insurance: NextPage = () => {
         </div>
       </div>
     </li>
+  ));
+
+  const selectItems = nfts.map(nft => (
+    <option key={nft.token_hash} value={nft.token_hash}>
+      {nft.metadata.name}
+    </option>
   ));
 
   //console.log(7, allnfts)
@@ -76,6 +84,45 @@ const Insurance: NextPage = () => {
                 ) : (
                   <ul className="menu p-4 w-70 text-base-content">{listItems}</ul>
                 )}
+              </div>
+            </div>
+            <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
+              <div className="z-10">
+                <div className="flex bg-base-100 items-center justify-center font-bold text-2xl">
+                  To make an insurence
+                </div>
+                <div className="bg-base-100 rounded-3xl shadow-md shadow-secondary border border-base-300 flex flex-col mt-1 relative">
+                  <div className="flex p-5 divide-y divide-base-300 justify-center items-center">
+                    <select className="select w-full max-w-xs select-bordered">
+                      <option disabled selected>
+                        Pick your favorite nft to insurence
+                      </option>
+                      {selectItems}
+                    </select>
+                  </div>
+
+                  <div className="flex p-5 divide-y divide-base-300 justify-center items-center">
+                    <select className="select w-full max-w-xs select-bordered">
+                      <option disabled selected>
+                        Choose you plan to be insured
+                      </option>
+                      <option value="1day">1 Day</option>
+                      <option value="1week">1 Week</option>
+                      <option value="1month">1 Month</option>
+                      <option value="1year">1 Year</option>
+                    </select>
+                  </div>
+                  <div className="flex p-5 divide-y divide-base-300 justify-center items-center">
+                    <input
+                      type="text"
+                      placeholder="Enter The price that triggers the payout"
+                      className="input input-bordered w-full max-w-xs"
+                    />
+                    <div className="m-2">MATIC</div>
+                  </div>
+
+                  <button className="btn btn-primary  mx-10 my-4">Calculate Premium</button>
+                </div>
               </div>
             </div>
           </div>
