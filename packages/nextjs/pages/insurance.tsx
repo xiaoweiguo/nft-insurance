@@ -93,8 +93,8 @@ const Insurance: NextPage = () => {
                 </div>
                 <div className="bg-base-100 rounded-3xl shadow-md shadow-secondary border border-base-300 flex flex-col mt-1 relative">
                   <div className="flex p-5 divide-y divide-base-300 justify-center items-center">
-                    <select className="select w-full max-w-xs select-bordered">
-                      <option disabled selected>
+                    <select className="select w-full max-w-xs select-bordered" defaultValue="0">
+                      <option disabled value="0">
                         Pick your favorite nft to insurence
                       </option>
                       {selectItems}
@@ -102,8 +102,8 @@ const Insurance: NextPage = () => {
                   </div>
 
                   <div className="flex p-5 divide-y divide-base-300 justify-center items-center">
-                    <select className="select w-full max-w-xs select-bordered">
-                      <option disabled selected>
+                    <select className="select w-full max-w-xs select-bordered" defaultValue="0">
+                      <option disabled value="0">
                         Choose you plan to be insured
                       </option>
                       <option value="1day">1 Day</option>
