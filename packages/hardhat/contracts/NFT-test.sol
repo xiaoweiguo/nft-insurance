@@ -6,14 +6,9 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 using Strings for uint256;
 
 contract Azuki2 is ERC721 {
-    // The tokenId of the token to be minted.
-    uint256 private _tokenId;
-
-    // Optional mapping for token URIs
-    mapping (uint256 => string) private _tokenURIs;
-
-    // Base URI
-    string private _baseURIextended;
+    uint256 private _tokenId; // The tokenId of the token to be minted.
+    mapping (uint256 => string) private _tokenURIs; // Optional mapping for token URIs
+    string private _baseURIextended; // Base URI
 
     constructor(string memory name_, string memory symbol_)
         payable
@@ -48,8 +43,6 @@ contract Azuki2 is ERC721 {
         // If there is a baseURI but no tokenURI, concatenate the tokenID to the baseURI.
         return string(abi.encodePacked(base, tokenId.toString()));
     }
-
-
 
     function mint(string memory tokenURI) public returns (uint256) {
         _tokenId += 1;
