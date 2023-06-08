@@ -1,8 +1,4 @@
-/*
- * @Author: Wmengti 0x3ceth@gmail.com
- * @LastEditTime: 2023-06-03 11:02:01
- * @Description: 
- */
+
 
 const tokenId = args[0];
 
