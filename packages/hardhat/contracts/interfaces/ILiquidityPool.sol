@@ -2,9 +2,18 @@
 
 pragma solidity ^0.8.10;
 
+/**
+ * @title ILiquidityPool Interface
+ * @dev Interface for the LiquidityPool contract.
+ */
 interface ILiquidityPool {
-  event Received(uint, uint);
-  event Sent(address, uint);
+    event Received(uint timestamp, uint amount);
+    event Sent(address indexed to, uint amount);
 
-  function sendEth(address payable _to, uint amount) external;
+    /**
+     * @notice Send ETH to a specified address.
+     * @param _to The address to send ETH to.
+     * @param amount The amount of ETH to send.
+     */
+    function sendEth(address payable _to, uint amount) external;
 }
