@@ -50,3 +50,37 @@ const asset = nftDATA.asset_events[0]
 console.log(asset)
 console.log(asset.total_price)
 return Functions.encodeUint256(asset.total_price)
+
+// Withdraw asset information for successful transactions
+const asset = nftDATA.asset_events[0];
+console.log(asset);
+
+// Define the object or array that stores the token_price variable
+const tokenPrices = {
+  token_price_1: asset.token_price_1,
+  token_price_2: asset.token_price_2,
+  token_price_3: asset.token_price_3,
+  // ...more 
+};
+
+// The initialization variable is used to store the valid token_price when the condition is met.
+let validTokenPrice = null;
+
+// Iterate through each property in the tokenPrices object and find the first value that is not null
+for (const priceKey in tokenPrices) {
+  const price = tokenPrices[priceKey];
+  if (price !== null) {
+    validTokenPrice = price;
+    break;
+  }
+}
+
+// Check if validTokenPrice is null
+if (validTokenPrice === null) {
+  throw Error("No valid token price found");
+}
+
+console.log(validTokenPrice);
+
+return Functions.encodeUint256(validTokenPrice);
+
