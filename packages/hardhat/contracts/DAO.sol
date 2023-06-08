@@ -15,24 +15,22 @@ import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
   using LinkedListLib for LinkedListLib.UintLinkedList;
 
-  LinkedListLib.UintLinkedList linkedListProposals;
-  IInsurance public insurance;
-  ILiquidityPool public immutable pool;
-  uint public numStakeholders;
-  uint public proposalIdCounter;
+  LinkedListLib.UintLinkedList linkedListProposals; // List of proposal IDs
+  IInsurance public insurance; // Insurance contract
+  ILiquidityPool public immutable pool; // Liquidity pool contract
+  uint public numStakeholders; // Number of stakeholders
+  uint public proposalIdCounter; // Counter for proposal IDs
 
-  /// constant
+  /// Constants
   uint public constant SHORTEST_STAKE_TIME = 5 seconds;
   uint public constant MAX_PROPOSAL_DURATION = 1 days;
 
-  /// @notice tokenId => Proposal
+  /// Mapping of tokenId to Proposal struct
   mapping(uint => Proposal) tokenIdToProposal;
-  mapping(address => bool) isStakeholder;
-  mapping(address => StakingHolder) stakingHolders;
-  /// @notice proposalId => Proposal
-  mapping(uint => Proposal) proposals;
-  /// @notice user => proposalId => isVoted
-  mapping(address => mapping(uint => bool)) isVoted;
+  mapping(address => bool) isStakeholder; // Mapping to check if an address is a stakeholder
+  mapping(address => StakingHolder) stakingHolders; // Mapping of address to StakingHolder struct
+  mapping(uint => Proposal) proposals; // Mapping of proposalId to Proposal struct
+  mapping(address => mapping(uint => bool)) isVoted; // Mapping of user to proposalId to check if the user has voted
 
   constructor(address poolAddress) ERC20("Azuki DAO", "AZDAO") {
     pool = ILiquidityPool(poolAddress);
@@ -57,11 +55,18 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     bool isPass;
   }
 
-
+  /**
+   * @dev Called when a proposal expires to indicate a failed proposal.
+   * @param proposalId The ID of the expired proposal.
+   */
   function proposalExpired(uint proposalId) external {
     insurance.proposalFailed(proposals[proposalId].beneficiaryAddress, proposals[proposalId].insurancePremium);
   }
 
+  /**
+   * @dev Allows a user to stake tokens in the DAO.
+   * @param stakingAmount The amount of tokens to stake.
+   */
   function stake(uint stakingAmount) external payable {
     require(msg.value == stakingAmount, "Incorrect staking amount");
     if (isStakeholder[msg.sender] == false) {
@@ -83,10 +88,19 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     emit Stake(msg.sender, stakingAmount, block.timestamp);
   }
 
+  /**
+   * @dev Calculates the amount of ETH equivalent to the staking amount.
+   * @param stakingAmount The staking amount in tokens.
+   * @return The equivalent amount in ETH.
+   */
   function getAmount(uint stakingAmount) external view returns (uint) {
     return _getAmount(stakingAmount);
   }
 
+  /**
+   * @dev Allows a user to withdraw their staked tokens.
+   * @param stakingAmount The amount of tokens to withdraw.
+   */
   function withdraw(uint stakingAmount) external {
     require(stakingHolders[msg.sender].stakingAmount >= stakingAmount, "Insufficient staking amount");
     require(block.timestamp >= stakingHolders[msg.sender].startTime + SHORTEST_STAKE_TIME, "Staking period not over");
@@ -102,6 +116,14 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     emit Withdraw(msg.sender, stakingAmount, block.timestamp);
   }
 
+  /**
+   * @dev Creates a new proposal.
+   * @param tokenId_ The ID of the token.
+   * @param insuranceDuration The duration of the insurance.
+   * @param insurancePremium The premium amount for the insurance.
+   * @param claimTrigger The trigger amount for the insurance claim.
+   * @param beneficiaryAddress The address of the beneficiary.
+   */
   function createProposal(
     uint tokenId_,
     uint insuranceDuration,
@@ -132,7 +154,11 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     emit CreateProposal(proposalId, tokenId_, beneficiaryAddress, block.timestamp);
   }
 
-  function vote(uint proposalId) external{
+  /**
+   * @dev Allows a stakeholder to vote on a proposal.
+   * @param proposalId The ID of the proposal.
+   */
+  function vote(uint proposalId) external {
     require(isStakeholder[msg.sender] == true, "Only DAO member can call");
     require(proposals[proposalId].isActive == true, "Proposal is not active");
     require(proposals[proposalId].isPass == false, "Proposal already pass");
@@ -155,69 +181,31 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     emit Vote(msg.sender, proposalId, block.timestamp);
   }
 
+  /**
+   * @dev Sets the address of the insurance contract.
+   * @param _insuranceAddress The address of the insurance contract.
+   */
   function setInsuranceAddress(address _insuranceAddress) external onlyOwner {
     insurance = IInsurance(_insuranceAddress);
   }
 
+  /**
+   * @dev Triggers the insurance contract to send ETH to a specified address.
+   * @param _to The address to send ETH to.
+   * @param amount The amount of ETH to send.
+   */
   function triggerInsurance(address _to, uint amount) external {
     require(msg.sender == address(insurance), "Only insurance can call");
     pool.sendEth(payable(_to), amount);
   }
 
-  ///internal function
-
-  function _getAmount(uint stakingAmount) internal view returns (uint) {
-    uint perAZDAOToETH = address(pool).balance / (totalSupply());
-    return stakingAmount * perAZDAOToETH;
-  }
-
-  function _createPolicy(
-    uint tokenId,
-    uint insuranceDuration,
-    uint insurancePremium,
-    uint claimTrigger,
-    address beneficiaryAddress
-  ) internal {
-    insurance.createPolicy(tokenId, insuranceDuration, insurancePremium, claimTrigger, beneficiaryAddress);
-  }
-
-  function _checkProposal(uint proposalId) internal view returns (bool) {
-    return proposals[proposalId].numVotes >= proposals[proposalId].targetVotes;
-  }
-
-  function _isExpired(uint proposalId) internal view returns (bool) {
-    return block.timestamp >= proposals[proposalId].createTime + MAX_PROPOSAL_DURATION;
-  }
-
-  function _removeProposal(uint proposalId) internal {
-    linkedListProposals.remove(proposalId);
-    proposals[proposalId].isActive = false;
-    delete tokenIdToProposal[proposals[proposalId].tokenId];
-  }
-
-  /// view function
-  function getStakingStartTime(address user) external view returns (uint) {
-    return stakingHolders[user].startTime;
-  }
-
-  function getStakingAmount(address user) external view returns (uint) {
-    return stakingHolders[user].stakingAmount;
-  }
-
-  function checkIsStakeholder(address user) external view returns (bool) {
-    return isStakeholder[user];
-  }
-
-  function checkIsVoted(address user, uint proposalId) external view returns (bool) {
-    return isVoted[user][proposalId];
-  }
-
-  function getProposal(uint proposalId) external view returns (Proposal memory proposal) {
-    proposal = proposals[proposalId];
-  }
-
-  /// chainlink automation
-  function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory performData) {
+  /**
+   * @dev Checks whether upkeep is needed for the DAO contract.
+   * @param data Not used.
+   * @return upkeepNeeded Whether upkeep is needed.
+   * @return performData Not used.
+   */
+  function checkUpkeep(bytes calldata data) external view override returns (bool upkeepNeeded, bytes memory performData) {
     upkeepNeeded = false;
     uint proposalId = linkedListProposals.getNode(0).next;
     uint[] memory result = new uint[](proposalIdCounter);
@@ -236,6 +224,10 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
     performData = abi.encode(result);
   }
 
+  /**
+   * @dev Performs the upkeep for the DAO contract.
+   * @param performData The data for performing the upkeep.
+   */
   function performUpkeep(bytes calldata performData) external override {
     uint[] memory result = abi.decode(performData, (uint[]));
     for (uint i = 0; i < result.length; i++) {
