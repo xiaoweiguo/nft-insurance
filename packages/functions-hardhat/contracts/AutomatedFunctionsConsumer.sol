@@ -29,8 +29,6 @@ contract AutomatedFunctionsConsumer is FunctionsClient, ConfirmedOwner, Automati
   uint256 public responseCounter;
   IInsurance public insurance;
 
-  // mapping(bytes32 => string) requistIdToTokenId;
-
   AggregatorV3Interface internal nftFloorPriceFeed;
 
   event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
