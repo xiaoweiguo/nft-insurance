@@ -153,7 +153,6 @@ contract AutomatedFunctionsConsumer is FunctionsClient, ConfirmedOwner, Automati
     responseCounter = responseCounter + 1;
     uint256 floorPrice = uint256(getLatestPrice());
     uint256 lastestPrice = abi.decode(response, (uint256));
-    // Insurance calculate
 
 
     emit OCRResponse(requestId, response, err);

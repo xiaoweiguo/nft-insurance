@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.10;
 
-import "./interfaces/IInsurance.sol";
-import "./interfaces/ILiquidityPool.sol";
-import "./interfaces/IDAO.sol";
+import "./insurance/interfaces/IInsurance.sol";
+import "./insurance/interfaces/ILiquidityPool.sol";
+import "./insurance/interfaces/IDAO.sol";
 
-import "./library/LinkedList.sol";
+import "./insurance/library/LinkedList.sol";
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
