@@ -4,8 +4,8 @@ pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./interfaces/ILiquidityPool.sol";
-import "./interfaces/IDAO.sol";
+import "./insurance/interfaces/ILiquidityPool.sol";
+import "./insurance/interfaces/IDAO.sol";
 
 contract LiquidityPool is ILiquidityPool, Ownable {
   IDAO DAO;

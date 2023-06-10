@@ -6,6 +6,7 @@ import {Functions, FunctionsClient} from "./dev/functions/FunctionsClient.sol";
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "./insurance/interfaces/IInsurance.sol";
 
 /**
  * @title Automated Functions Consumer contract
@@ -26,6 +27,9 @@ contract AutomatedFunctionsConsumer is FunctionsClient, ConfirmedOwner, Automati
   uint256 public lastUpkeepTimeStamp;
   uint256 public upkeepCounter;
   uint256 public responseCounter;
+  IInsurance public insurance;
+
+  // mapping(bytes32 => string) requistIdToTokenId;
 
   AggregatorV3Interface internal nftFloorPriceFeed;
 
@@ -94,6 +98,10 @@ contract AutomatedFunctionsConsumer is FunctionsClient, ConfirmedOwner, Automati
     requestCBOR = newRequestCBOR;
   }
 
+  function setInsurance(address _insurance) external onlyOwner {
+    insurance = IInsurance(_insurance);
+  }
+
   /**
    * @notice Used by Automation to check if performUpkeep should be called.
    *
@@ -151,10 +159,8 @@ contract AutomatedFunctionsConsumer is FunctionsClient, ConfirmedOwner, Automati
     latestResponse = response;
     latestError = err;
     responseCounter = responseCounter + 1;
-    uint256 floorPrice = uint256(getLatestPrice());
-    uint256 lastestPrice = abi.decode(response, (uint256));
-
-
+    (uint256 lastestPrice, uint256 tokenId) = abi.decode(response, (uint256, uint256));
+    insurance.checkTrigger(tokenId, lastestPrice);
     emit OCRResponse(requestId, response, err);
   }
 

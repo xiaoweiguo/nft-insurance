@@ -205,7 +205,9 @@ contract DAO is Ownable, ERC20, IDAO, AutomationCompatibleInterface {
    * @return upkeepNeeded Whether upkeep is needed.
    * @return performData Not used.
    */
-  function checkUpkeep(bytes calldata data) external view override returns (bool upkeepNeeded, bytes memory performData) {
+  function checkUpkeep(
+    bytes calldata data
+  ) external view override returns (bool upkeepNeeded, bytes memory performData) {
     upkeepNeeded = false;
     uint proposalId = linkedListProposals.getNode(0).next;
     uint[] memory result = new uint[](proposalIdCounter);

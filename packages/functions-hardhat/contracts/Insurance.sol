@@ -5,10 +5,10 @@ pragma solidity ^0.8.10;
 import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
-import "./library/LinkedList.sol";
+import "./insurance/library/LinkedList.sol";
 
-import "./interfaces/IDAO.sol";
-import "./interfaces/IInsurance.sol";
+import "./insurance/interfaces/IDAO.sol";
+import "./insurance/interfaces/IInsurance.sol";
 
 /**
  * @title Insurance Contract
@@ -20,6 +20,7 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
   AggregatorV3Interface internal nftFloorPriceFeed;
   address immutable Azuki_Address;
   address payable immutable Pool_Address;
+  address immutable functionsConsumerAddress;
   IDAO immutable DAO;
 
   uint premiumRateFactor = 30; // 30%
@@ -33,10 +34,11 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
   /// @notice tokenId => policyId
   mapping(uint => uint) tokenIdToPolicyId;
 
-  constructor(address AzukiAddress, address DAOAddress, address PoolAddress) {
-    Azuki_Address = AzukiAddress;
-    DAO = IDAO(DAOAddress);
-    Pool_Address = payable(PoolAddress);
+  constructor(address _azukiAddress, address _DAOAddress, address _poolAddress, address _functionsConsumerAddress) {
+    Azuki_Address = _azukiAddress;
+    functionsConsumerAddress = _functionsConsumerAddress;
+    DAO = IDAO(_DAOAddress);
+    Pool_Address = payable(_poolAddress);
     nftFloorPriceFeed = AggregatorV3Interface(0x16c74d1f6986c6Ffb48540b178fF8Cb0ED9F13b0);
   }
 
@@ -141,7 +143,9 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
    * @return upkeepNeeded True if upkeep is needed, false otherwise
    * @return performData The data to perform the upkeep
    */
-  function checkUpkeep(bytes calldata data) external view override returns (bool upkeepNeeded, bytes memory performData) {
+  function checkUpkeep(
+    bytes calldata data
+  ) external view override returns (bool upkeepNeeded, bytes memory performData) {
     upkeepNeeded = false;
     uint[] memory results = new uint[](policyIdCounter);
     uint policyId = linkedListPolicies.getNode(0).next;
@@ -197,11 +201,26 @@ contract Insurance is AutomationCompatibleInterface, IInsurance {
   }
 
   /**
+   * @notice check if the insurance policy is triggered
+   * @param tokenId The ID of the token to be insured
+   * @param price The NFT deal price
+   */
+  function checkTrigger(uint tokenId, uint price) external {
+    require(msg.sender == functionsConsumerAddress);
+    uint policyId = tokenIdToPolicyId[tokenId];
+    if (policyId != 0) {
+      if (price >= insurancePolicies[policyId].claimTrigger) {
+        _triggerInsurance(policyId);
+      }
+    }
+  }
+
+  /**
    * @notice Trigger an insurance policy and settle the claim
    * @param policyId The ID of the insurance policy to trigger
    */
   function _triggerInsurance(uint policyId) internal {
-    require(insurancePolicies[policyId].isActive == true, "Policy is not active");
+    require(insurancePolicies[policyId].isActive, "Policy is not active");
     require(_checkExpiredDown(policyId), "Policy is expired");
 
     DAO.triggerInsurance(insurancePolicies[policyId].beneficiaryAddress, insurancePolicies[policyId].claimTrigger);
